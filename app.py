@@ -1,15 +1,16 @@
 import logging
-
-logging.basicConfig(level=logging.DEBUG)
-
 from fastapi import FastAPI, Body
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 import importlib.util
 import pathlib
 import inspect
-from models import *
+from models import Credentials
+from models import Voice
+from models import SynthesizePayload
 from engines.base import BaseEngine
+
+logging.basicConfig(level=logging.DEBUG)
 
 # Loading engines
 engines: list[BaseEngine] = []
