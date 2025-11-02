@@ -2,6 +2,7 @@ import io
 
 from engines.base import BaseEngine
 from models import Voice
+from dataclasses import asdict
 
 from urllib.request import urlopen
 from piper import download_voices
@@ -19,13 +20,7 @@ class PiperEngine(BaseEngine):
     def __init__(self):
         self.loaded_voice = ""
         self.piper_voice = None
-        # self.synth_config = SynthesisConfig(
-        #     volume=0.5,  # half as loud
-        #     length_scale=1.0,
-        #     noise_scale=1.0,  # more audio variation
-        #     noise_w_scale=1.0,  # more speaking variation
-        #     normalize_audio=False, # use raw audio from voice
-        # )
+        self.synth_config = SynthesisConfig()
 
         logging.info("Loading piper model...")
 
@@ -47,24 +42,47 @@ class PiperEngine(BaseEngine):
             ))
 
         return voices_list
+    
+    def _load_voice(self, voice: Voice):
+        logging.debug(f"Voice not loaded: {voice.id}")
+        download_path = Path(Path.cwd() / "models")
+
+        if download_path.exists() is False:
+            download_path.mkdir()
+
+        model_path = download_path / f"{voice.id}.onnx"
+        
+        if model_path.exists() is False and model_path.stat().st_size == 0:
+            logging.debug(f"Downloading model: {voice.id}")
+            download_voices.download_voice(voice.id, download_path)
+        else:
+            logging.debug(f"Model is downloaded: {voice.id}")
+
+        self.piper_voice = PiperVoice.load(model_path)
+
+        config_path = download_path / f"{voice.id}_config.json"
+        
+        if config_path.exists():
+            logging.debug(f"Loading synthesis config for {voice.id}")
+            with open(config_path, 'r') as f:
+                self.synth_config = SynthesisConfig(**json.load(f))
+        else:
+            logging.debug(f"Creating synthesis config for {voice.id}")
+            self.synth_config = SynthesisConfig()
+            with open(config_path, 'w') as f:
+                json.dump(asdict(self.synth_config), f)
+        
+        logging.debug(self.synth_config)
+                                
+        logging.debug(f"Voice loaded: {voice.id}")
 
     def synthesize_voice(self, voice: Voice, text: str) -> bytes:
         if self.loaded_voice != voice.id:
-            logging.debug(f"Voice not loaded: {voice.id}")
-            voices_path = Path(Path.cwd() / "voices")
-
-            if voices_path.exists() is False:
-                voices_path.mkdir()
-            
-            download_voices.download_voice(voice.id, voices_path)
-            
+            self._load_voice(voice)
             self.loaded_voice = voice.id
-            self.piper_voice = PiperVoice.load(voices_path / f"{self.loaded_voice}.onnx")
-            logging.debug(f"Voice loaded: {voice.id}")
 
         logging.debug(f"Synthesizing: {text}")
-        # TODO: Make this use a config per voice which Liv can edit
-        audio_chunks = self.piper_voice.synthesize(text) #, syn_config=self.synth_config)
+        audio_chunks = self.piper_voice.synthesize(text, syn_config=self.synth_config)
         audio_stream = pydub.AudioSegment.empty()
 
         for chunk in audio_chunks:
