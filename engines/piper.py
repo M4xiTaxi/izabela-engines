@@ -52,7 +52,10 @@ class PiperEngine(BaseEngine):
 
         model_path = download_path / f"{voice.id}.onnx"
         
-        if model_path.exists() is False and model_path.stat().st_size == 0:
+        if model_path.exists() is False:
+            logging.debug(f"Downloading model: {voice.id}")
+            download_voices.download_voice(voice.id, download_path)
+        elif model_path.stat().st_size == 0:
             logging.debug(f"Downloading model: {voice.id}")
             download_voices.download_voice(voice.id, download_path)
         else:

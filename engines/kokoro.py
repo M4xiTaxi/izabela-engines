@@ -36,6 +36,7 @@ class KokoroEngine(BaseEngine):
             self.voice_dict = heart_fallback
 
         logging.info("Loading Kokoro model...")
+        # TODO: find out how to stop it from downloading the model every single time
         self._model = KModel(repo_id='hexgrad/Kokoro-82M').eval()
         self._pipeline = None
 
